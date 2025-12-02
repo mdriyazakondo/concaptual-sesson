@@ -3,10 +3,12 @@ const express = require("express");
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const admin = require("firebase-admin");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const port = process.env.PORT || 3000;
 const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
   "utf-8"
 );
+
 const serviceAccount = JSON.parse(decoded);
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -16,11 +18,7 @@ const app = express();
 // middleware
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:5174",
-      "https://b12-m11-session.web.app",
-    ],
+    origin: [process.env.CLIENT_DOMIN],
     credentials: true,
     optionSuccessStatus: 200,
   })
@@ -55,6 +53,7 @@ async function run() {
   try {
     const db = client.db("plant_shop");
     const plantCollection = db.collection("plants");
+    const orderCollection = db.collection("orders");
 
     //===== plants api =========//
     app.get("/plants", async (req, res) => {
@@ -92,6 +91,105 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await plantCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    //====== Payment Releted api ==========//
+
+    app.post("/create-checkout-session", async (req, res) => {
+      const paymentInfo = req.body;
+      console.log(paymentInfo);
+      const session = await stripe.checkout.sessions.create({
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: paymentInfo.name,
+                description: paymentInfo.description,
+                images: [paymentInfo.image],
+              },
+              unit_amount: paymentInfo?.price * 100,
+            },
+            quantity: paymentInfo?.quantity,
+          },
+        ],
+        customer_email: paymentInfo?.customer.email,
+        mode: "payment",
+        metadata: {
+          plantId: paymentInfo.plantId,
+          name: paymentInfo?.customer?.name,
+          customer: paymentInfo?.customer?.email,
+        },
+        success_url: `${process.env.CLIENT_DOMIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.CLIENT_DOMIN}/plant/${paymentInfo.plantId}`,
+      });
+      res.send({ url: session?.url });
+    });
+
+    app.post("/payment-success", async (req, res) => {
+      const { sessionId } = req.body;
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      const plants = await plantCollection.findOne({
+        _id: new ObjectId(session?.metadata?.plantId),
+      });
+      const order = await orderCollection.findOne({
+        transationId: session.payment_intent,
+      });
+      if (session.status === "complete" && plants && !order) {
+        const orderInfo = {
+          plantId: session?.metadata?.plantId,
+          transationId: session.payment_intent,
+          customer: session.metadata.customer,
+          status: "pending",
+          seler: plants.seler,
+          name: plants.name,
+          category: plants.category,
+          quantity: 1,
+          image: plants.photoURL,
+          price: session.amount_total / 100,
+        };
+
+        console.log(orderInfo);
+        const result = await orderCollection.insertOne(orderInfo);
+        const updatePlant = await plantCollection.updateOne(
+          { _id: new ObjectId(session?.metadata?.plantId) },
+          { $inc: { quantity: -1 } }
+        );
+        return res.send({
+          transationId: session.payment_intent,
+          orderId: result.insertedId,
+        });
+      }
+      res.send({
+        transationId: session.payment_intent,
+        orderId: result._id,
+      });
+    });
+
+    //===== get all orders data ==========//
+
+    app.get("/my-orders/:email", async (req, res) => {
+      const email = req.params.email;
+      const result = await orderCollection.find({ customer: email }).toArray();
+      res.send(result);
+    });
+
+    //===== get all manage  data ==========//
+    app.get("/manage-orders/:email", async (req, res) => {
+      const email = req.params.email;
+      const result = await orderCollection
+        .find({ "seler.email": email })
+        .toArray();
+      res.send(result);
+    });
+
+    //===== get all manage  data ==========//
+    app.get("/my-inventory/:email", async (req, res) => {
+      const email = req.params.email;
+      const result = await plantCollection
+        .find({ "seler.email": email })
+        .toArray();
       res.send(result);
     });
 
