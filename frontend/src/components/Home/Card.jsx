@@ -1,49 +1,49 @@
-import { Link } from 'react-router'
+import { Link } from "react-router";
 
-const Card = () => {
+const Card = ({ plant }) => {
   return (
     <Link
-      to={`/plant/1`}
-      className='col-span-2 cursor-pointer group shadow-xl p-3 rounded-xl'
+      to={`/plant/${plant._id}`}
+      className="col-span-2 cursor-pointer group shadow-xl p-3 rounded-xl"
     >
-      <div className='flex flex-col gap-2 w-full'>
+      <div className="flex flex-col gap-2 w-full">
         <div
-          className='
+          className="
               aspect-square 
               w-full 
               relative 
               overflow-hidden 
               rounded-xl
-            '
+            "
         >
           <img
-            className='
+            className="
                 object-cover 
                 h-full 
                 w-full 
                 group-hover:scale-110 
                 transition
-              '
-            src='https://i.ibb.co.com/rMHmQP2/money-plant-in-feng-shui-brings-luck.jpg'
-            alt='Plant Image'
+              "
+            src={plant.photoURL}
+            alt="Plant Image"
           />
           <div
-            className='
+            className="
               absolute
               top-3
               right-3
-            '
+            "
           ></div>
         </div>
-        <div className='font-semibold text-lg'>Money Plant</div>
-        <div className='font-semibold text-lg'>Category: Indoor</div>
-        <div className='font-semibold text-lg'>Quantity: 10</div>
-        <div className='flex flex-row items-center gap-1'>
-          <div className='font-semibold'> Price: $15</div>
+        <div className="font-semibold text-lg">{plant.name}</div>
+        <div className="font-semibold text-lg">Category: {plant.category}</div>
+        <div className="font-semibold text-lg">Quantity: {plant.category}</div>
+        <div className="flex flex-row items-center gap-1">
+          <div className="font-semibold"> Price: ${plant.price}</div>
         </div>
       </div>
     </Link>
-  )
-}
+  );
+};
 
-export default Card
+export default Card;

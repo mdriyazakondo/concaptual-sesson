@@ -25,6 +25,9 @@ const SignUp = () => {
 
     try {
       const photoURL = await imageUpload(imageFile);
+      // const imageCloudinary = await imageUploadCloudinary(imageFile);
+      // console.log("cloudinary", imageCloudinary);
+
       const result = await createUser(email, password);
       await updateUserProfile(name, photoURL);
       if (result.user) {
