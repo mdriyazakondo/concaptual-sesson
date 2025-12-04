@@ -54,6 +54,7 @@ async function run() {
     const db = client.db("plant_shop");
     const plantCollection = db.collection("plants");
     const orderCollection = db.collection("orders");
+    const userCollection = db.collection("users");
 
     //===== plants api =========//
     app.get("/plants", async (req, res) => {
@@ -191,6 +192,30 @@ async function run() {
         .find({ "seler.email": email })
         .toArray();
       res.send(result);
+    });
+
+    //======== user releted api  ==============//
+    app.post("/user", async (req, res) => {
+      const newUser = req.body;
+      newUser.create_At = new Date().toISOString();
+      newUser.last_loggedIn = new Date().toISOString();
+      newUser.role = "customer";
+      const query = { email: newUser.email };
+      const existUser = await userCollection.findOne(query);
+      if (existUser) {
+        const updateUser = await userCollection.updateOne(query, {
+          $set: { last_loggedIn: new Date().toISOString() },
+        });
+        return res.send(updateUser);
+      }
+      const result = await userCollection.insertOne(newUser);
+      res.send(result);
+    });
+
+    app.get("/user/role/:email", async (req, res) => {
+      const email = req.params.email;
+      const result = await userCollection.findOne({ email });
+      res.send({ role: result?.role });
     });
 
     await client.db("admin").command({ ping: 1 });
