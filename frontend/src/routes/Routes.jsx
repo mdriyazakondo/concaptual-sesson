@@ -15,6 +15,9 @@ import ManageOrders from "../pages/Dashboard/Seller/ManageOrders";
 import MyOrders from "../pages/Dashboard/Customer/MyOrders";
 import { createBrowserRouter } from "react-router";
 import PaymentSuccess from "../pages/Payment/PaymentSuccess";
+import SellerRequests from "../pages/Dashboard/Admin/SellerRequests";
+import SellerRoute from "./SellerRoute";
+import AdminRoute from "./AdminRoute";
 
 export const router = createBrowserRouter([
   {
@@ -58,7 +61,9 @@ export const router = createBrowserRouter([
         path: "add-plant",
         element: (
           <PrivateRoute>
-            <AddPlant />
+            <SellerRoute>
+              <AddPlant />
+            </SellerRoute>
           </PrivateRoute>
         ),
       },
@@ -66,7 +71,19 @@ export const router = createBrowserRouter([
         path: "my-inventory",
         element: (
           <PrivateRoute>
-            <MyInventory />
+            <SellerRoute>
+              <MyInventory />
+            </SellerRoute>
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "seller-requests",
+        element: (
+          <PrivateRoute>
+            <AdminRoute>
+              <SellerRequests />
+            </AdminRoute>
           </PrivateRoute>
         ),
       },
@@ -74,7 +91,9 @@ export const router = createBrowserRouter([
         path: "manage-users",
         element: (
           <PrivateRoute>
-            <ManageUsers />
+            <AdminRoute>
+              <ManageUsers />
+            </AdminRoute>
           </PrivateRoute>
         ),
       },
@@ -96,7 +115,13 @@ export const router = createBrowserRouter([
       },
       {
         path: "manage-orders",
-        element: <ManageOrders />,
+        element: (
+          <PrivateRoute>
+            <SellerRoute>
+              <ManageOrders />
+            </SellerRoute>
+          </PrivateRoute>
+        ),
       },
     ],
   },
