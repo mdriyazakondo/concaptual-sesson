@@ -28,12 +28,12 @@ app.use(express.json());
 // jwt middlewares
 const verifyJWT = async (req, res, next) => {
   const token = req?.headers?.authorization?.split(" ")[1];
-  console.log(token);
+  // console.log(token);
   if (!token) return res.status(401).send({ message: "Unauthorized Access!" });
   try {
     const decoded = await admin.auth().verifyIdToken(token);
     req.tokenEmail = decoded.email;
-    console.log(decoded);
+    // console.log(decoded);
     next();
   } catch (err) {
     console.log(err);
@@ -55,6 +55,27 @@ async function run() {
     const plantCollection = db.collection("plants");
     const orderCollection = db.collection("orders");
     const userCollection = db.collection("users");
+    const sellerRequestCollection = db.collection("sellerRequest");
+
+    //======= Role Middleware ==========//
+    const verifyADMIN = async (req, res, next) => {
+      const email = req.tokenEmail;
+      const users = await userCollection.findOne({ email });
+      if (users?.role !== "admin")
+        return res
+          .status(403)
+          .seler({ message: "Admin Only Actions", role: users?.role });
+      next();
+    };
+    const verifySELLER = async (req, res, next) => {
+      const email = req.tokenEmail;
+      const users = await userCollection.findOne({ email });
+      if (users?.role !== "seller")
+        return res
+          .status(403)
+          .seler({ message: "Seller Only Actions", role: users?.role });
+      next();
+    };
 
     //===== plants api =========//
     app.get("/plants", async (req, res) => {
@@ -69,7 +90,7 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/plants", async (req, res) => {
+    app.post("/plants", verifyJWT, verifySELLER, async (req, res) => {
       const newPlants = req.body;
       const result = await plantCollection.insertOne(newPlants);
       res.send(result);
@@ -170,14 +191,15 @@ async function run() {
 
     //===== get all orders data ==========//
 
-    app.get("/my-orders/:email", async (req, res) => {
-      const email = req.params.email;
-      const result = await orderCollection.find({ customer: email }).toArray();
+    app.get("/my-orders", verifyJWT, async (req, res) => {
+      const result = await orderCollection
+        .find({ customer: req.tokenEmail })
+        .toArray();
       res.send(result);
     });
 
     //===== get all manage  data ==========//
-    app.get("/manage-orders/:email", async (req, res) => {
+    app.get("/manage-orders/:email",verifyJWT, verifySELLER, async (req, res) => {
       const email = req.params.email;
       const result = await orderCollection
         .find({ "seler.email": email })
@@ -186,7 +208,7 @@ async function run() {
     });
 
     //===== get all manage  data ==========//
-    app.get("/my-inventory/:email", async (req, res) => {
+    app.get("/my-inventory/:email",verifyJWT, verifySELLER, async (req, res) => {
       const email = req.params.email;
       const result = await plantCollection
         .find({ "seler.email": email })
@@ -212,10 +234,43 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/user/role/:email", async (req, res) => {
-      const email = req.params.email;
-      const result = await userCollection.findOne({ email });
+    app.get("/user/role", verifyJWT, async (req, res) => {
+      const result = await userCollection.findOne({ email: req.tokenEmail });
       res.send({ role: result?.role });
+    });
+    app.get("/users", verifyJWT,verifyADMIN, async (req, res) => {
+      const adminEmail = req.tokenEmail;
+      const result = await userCollection
+        .find({ email: { $ne: adminEmail } })
+        .toArray();
+      res.send(result);
+    });
+
+    //========= handle become-seller ==============//
+    app.post("/become-seller", verifyJWT, async (req, res) => {
+      const email = req.tokenEmail;
+      const alreadyExists = await sellerRequestCollection.findOne({ email });
+      if (alreadyExists)
+        return res
+          .status(409)
+          .send({ message: "Already Request, Please wait!" });
+      const result = await sellerRequestCollection.insertOne({ email });
+      res.send(result);
+    });
+
+    app.get("/seller-request", verifyJWT,verifyADMIN, async (req, res) => {
+      const result = await sellerRequestCollection.find().toArray();
+      res.send(result);
+    });
+
+    app.patch("/update-role", verifyJWT,verifyADMIN, async (req, res) => {
+      const { email, role } = req.body;
+      const result = await userCollection.updateOne(
+        { email },
+        { $set: { role } }
+      );
+      await sellerRequestCollection.deleteOne({ email });
+      res.send(result);
     });
 
     await client.db("admin").command({ ping: 1 });
